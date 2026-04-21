@@ -178,7 +178,7 @@ static void send_html(int fd) {
         "<div class=\"hero\">"
         "<div>"
         "<h1>Process Monitor</h1>"
-        "<div class=\"sub\">A web GUI for viewing running processes and terminating them manually.</div>"
+        "<div class=\"sub\">A web GUI for viewing running processes with automatic threshold-based termination and manual terminate control.</div>"
         "</div>"
         "<div class=\"pill\" id=\"status\">Waiting for data...</div>"
         "</div>"
