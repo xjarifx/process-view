@@ -8,11 +8,13 @@
 
 static volatile sig_atomic_t g_stop = 0;
 
+/* Signal handler that requests a clean shutdown of the main loop. */
 static void on_signal(int sig) {
     (void)sig;
     g_stop = 1;
 }
 
+/* Program entry point: initialize subsystems, run scan/update loop, and cleanup. */
 int main(void) {
     MonitorContext monitor;
     DashboardState dashboard;

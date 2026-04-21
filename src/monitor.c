@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
+/* Reads aggregate CPU jiffies from /proc/stat for delta-based CPU usage calculation. */
 static unsigned long long read_total_jiffies(void) {
     FILE *fp;
     char line[1024];
@@ -41,6 +42,7 @@ static unsigned long long read_total_jiffies(void) {
     return user + nice + system + idle + iowait + irq + softirq + steal;
 }
 
+/* Looks up the previous sampled CPU time for a specific PID. */
 static int get_prev_proc_time(MonitorContext *ctx, pid_t pid, unsigned long long *out) {
     size_t i;
     for (i = 0; i < ctx->count; ++i) {
@@ -52,6 +54,7 @@ static int get_prev_proc_time(MonitorContext *ctx, pid_t pid, unsigned long long
     return -1;
 }
 
+/* Replaces the previous PID->CPU-time table with the latest scan snapshot. */
 static int update_prev_table(MonitorContext *ctx, const ProcessInfo *list, size_t n) {
     PrevProcEntry *new_entries;
     size_t i;
@@ -73,6 +76,7 @@ static int update_prev_table(MonitorContext *ctx, const ProcessInfo *list, size_
     return 0;
 }
 
+/* Reads the process name from /proc/<pid>/comm. */
 static int read_proc_name(pid_t pid, char *name, size_t len) {
     char path[64];
     FILE *fp;
@@ -93,6 +97,7 @@ static int read_proc_name(pid_t pid, char *name, size_t len) {
     return 0;
 }
 
+/* Reads resident memory (KB), first from status and then fallback to statm. */
 static long read_proc_memory_kb(pid_t pid) {
     char path[64];
     FILE *fp;
@@ -137,6 +142,7 @@ static long read_proc_memory_kb(pid_t pid) {
     return 0;
 }
 
+/* Reads user/system CPU times from /proc/<pid>/stat. */
 static int read_proc_times(pid_t pid, unsigned long long *utime, unsigned long long *stime) {
     char path[64];
     FILE *fp;
@@ -183,6 +189,7 @@ static int read_proc_times(pid_t pid, unsigned long long *utime, unsigned long l
     return -1;
 }
 
+/* Initializes monitor state and captures the CPU core count. */
 int monitor_init(MonitorContext *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     ctx->num_cpus = (int)sysconf(_SC_NPROCESSORS_ONLN);
@@ -192,6 +199,7 @@ int monitor_init(MonitorContext *ctx) {
     return 0;
 }
 
+/* Releases monitor allocations and resets its state. */
 void monitor_cleanup(MonitorContext *ctx) {
     free(ctx->entries);
     ctx->entries = NULL;
@@ -200,6 +208,7 @@ void monitor_cleanup(MonitorContext *ctx) {
     ctx->prev_total_jiffies = 0;
 }
 
+/* Scans /proc, builds a process snapshot, and computes per-process CPU usage. */
 int monitor_scan(MonitorContext *ctx, ProcessInfo **out_list, size_t *out_count) {
     DIR *proc_dir;
     struct dirent *entry;

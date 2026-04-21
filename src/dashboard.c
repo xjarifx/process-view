@@ -18,6 +18,7 @@
 #define DASHBOARD_BACKLOG 8
 #define REQUEST_BUF_SIZE 2048
 
+/* Sort comparator that orders processes by descending CPU usage. */
 static int cmp_cpu_desc(const void *a, const void *b) {
     const ProcessInfo *pa = (const ProcessInfo *)a;
     const ProcessInfo *pb = (const ProcessInfo *)b;
@@ -31,6 +32,7 @@ static int cmp_cpu_desc(const void *a, const void *b) {
     return 0;
 }
 
+/* Ensures the dashboard snapshot buffer can hold the required number of processes. */
 static int ensure_capacity(DashboardState *state, size_t needed) {
     ProcessInfo *tmp;
     size_t new_cap;
@@ -58,6 +60,7 @@ static int ensure_capacity(DashboardState *state, size_t needed) {
     return 0;
 }
 
+/* Sends an entire buffer over a socket, retrying until all bytes are written or send fails. */
 static void write_all(int fd, const char *buf, size_t len) {
     size_t off = 0;
 
@@ -70,10 +73,12 @@ static void write_all(int fd, const char *buf, size_t len) {
     }
 }
 
+/* Convenience wrapper to send a NUL-terminated string to a socket. */
 static void write_str(int fd, const char *s) {
     write_all(fd, s, strlen(s));
 }
 
+/* Writes a JSON-escaped string value so process names remain valid JSON. */
 static void write_json_string(int fd, const char *s) {
     const unsigned char *p = (const unsigned char *)s;
 
@@ -117,6 +122,7 @@ static void write_json_string(int fd, const char *s) {
     write_str(fd, "\"");
 }
 
+/* Sends a complete HTTP response with status, content type, and body. */
 static void send_response(int fd, const char *status, const char *content_type, const char *body) {
     char header[256];
     size_t body_len = strlen(body);
@@ -131,6 +137,7 @@ static void send_response(int fd, const char *status, const char *content_type, 
     write_str(fd, body);
 }
 
+/* Serves the dashboard HTML/CSS/JS frontend page. */
 static void send_html(int fd) {
     static const char *html =
         "<!doctype html>"
@@ -194,6 +201,7 @@ static void send_html(int fd) {
     send_response(fd, "200 OK", "text/html; charset=utf-8", html);
 }
 
+/* Serves the latest process snapshot as JSON for frontend polling. */
 static void send_json(DashboardState *state, int fd) {
     ProcessInfo *processes = NULL;
     size_t count;
@@ -241,6 +249,7 @@ static void send_json(DashboardState *state, int fd) {
     free(processes);
 }
 
+/* Finds a process by PID in the current dashboard snapshot. */
 static int get_process_by_pid(DashboardState *state, pid_t pid, ProcessInfo *out) {
     size_t i;
     int found = 0;
@@ -258,6 +267,7 @@ static int get_process_by_pid(DashboardState *state, pid_t pid, ProcessInfo *out
     return found;
 }
 
+/* Sends a small JSON message used for terminate API success/error responses. */
 static void send_json_result(int fd, const char *status, const char *result, const char *message) {
     char body[256];
 
@@ -269,6 +279,7 @@ static void send_json_result(int fd, const char *status, const char *result, con
     send_response(fd, status, "application/json; charset=utf-8", body);
 }
 
+/* Validates terminate requests and dispatches manual process termination. */
 static void handle_terminate(DashboardState *state, int client_fd, const char *path) {
     const char *pid_str = strstr(path, "pid=");
     char *end = NULL;
@@ -299,6 +310,7 @@ static void handle_terminate(DashboardState *state, int client_fd, const char *p
     }
 }
 
+/* Routes one HTTP request to state, terminate, HTML, or not-found handlers. */
 static void handle_client(DashboardState *state, int client_fd) {
     char request[REQUEST_BUF_SIZE];
     char method[8];
@@ -329,6 +341,7 @@ static void handle_client(DashboardState *state, int client_fd) {
     }
 }
 
+/* Background server loop that polls the listening socket and handles each client. */
 static void *server_thread(void *arg) {
     DashboardState *state = (DashboardState *)arg;
     struct pollfd pfd;
@@ -363,6 +376,7 @@ static void *server_thread(void *arg) {
     return NULL;
 }
 
+/* Opens the local dashboard URL in the default browser via xdg-open. */
 static void launch_browser(int port) {
     char url[64];
     pid_t pid = fork();
@@ -376,6 +390,7 @@ static void launch_browser(int port) {
     _exit(0);
 }
 
+/* Initializes dashboard state and synchronization primitives. */
 int dashboard_init(DashboardState *state) {
     memset(state, 0, sizeof(*state));
     if (pthread_mutex_init(&state->mutex, NULL) != 0) {
@@ -387,6 +402,7 @@ int dashboard_init(DashboardState *state) {
     return 0;
 }
 
+/* Releases dashboard memory and destroys synchronization primitives. */
 void dashboard_cleanup(DashboardState *state) {
     free(state->processes);
     state->processes = NULL;
@@ -395,6 +411,7 @@ void dashboard_cleanup(DashboardState *state) {
     pthread_mutex_destroy(&state->mutex);
 }
 
+/* Starts the HTTP server thread and begins listening on localhost. */
 int dashboard_start(DashboardState *state) {
     int opt = 1;
     struct sockaddr_in addr;
@@ -439,6 +456,7 @@ int dashboard_start(DashboardState *state) {
     return 0;
 }
 
+/* Stops the HTTP server and waits for the server thread to exit. */
 void dashboard_stop(DashboardState *state) {
     if (!state->running) {
         return;
@@ -453,6 +471,7 @@ void dashboard_stop(DashboardState *state) {
     pthread_join(state->thread, NULL);
 }
 
+/* Copies the newest process scan into the shared dashboard snapshot. */
 void dashboard_update(DashboardState *state, const ProcessInfo *list, size_t count) {
     ProcessInfo *copy = NULL;
 

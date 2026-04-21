@@ -5,6 +5,7 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Checks whether a PID still exists and is reachable by the current user. */
 static int process_alive(pid_t pid) {
     if (kill(pid, 0) == 0) {
         return 1;
@@ -15,6 +16,7 @@ static int process_alive(pid_t pid) {
     return 0;
 }
 
+/* Performs manual termination: try SIGTERM first, then force SIGKILL if needed. */
 int action_manual_terminate(const ProcessInfo *proc) {
     struct timespec ts;
     int i;
